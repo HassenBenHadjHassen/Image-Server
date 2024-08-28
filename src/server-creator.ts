@@ -1,5 +1,5 @@
 import express, { Request, Response } from "express";
-import fs from "fs";
+import fs from "fs/promises";
 import path from "path";
 import dotenv from "dotenv";
 
@@ -7,7 +7,7 @@ dotenv.config();
 
 export const setupExpressServer = (): void => {
   const app = express();
-  const PORT = process.env.PORT;
+  const PORT = process.env.PORT || 3000;
 
   // Middleware to serve static files from the 'public' directory
   app.use(express.static(path.join(__dirname, "public")));
@@ -17,18 +17,13 @@ export const setupExpressServer = (): void => {
   });
 
   // Route to handle image requests
-  app.get("/images/:imageName", (req: Request, res: Response) => {
+  app.get("/images/:imageName", async (req: Request, res: Response) => {
     const { imageName } = req.params;
-    // Assuming images are stored in a directory named 'images'
     const imagesDirectory = path.join(__dirname, "images");
 
-    // Read the files in the directory
-    fs.readdir(imagesDirectory, (err, files) => {
-      if (err) {
-        console.error("Error reading images directory:", err);
-        return res.status(500).send("Internal Server Error");
-      }
-
+    try {
+      // Read files in the directory once
+      const files = await fs.readdir(imagesDirectory);
       // Find the file with matching name prefix
       const matchingFile = files.find((file) => file.startsWith(imageName));
 
@@ -37,12 +32,12 @@ export const setupExpressServer = (): void => {
       }
 
       const imagePath = path.join(imagesDirectory, matchingFile);
-
-      console.log("imagePath", imagePath);
-
-      // Serve the image file
+      console.log("Serving image:", imagePath);
       return res.sendFile(imagePath);
-    });
+    } catch (err) {
+      console.error("Error handling image request:", err);
+      return res.status(500).send("Internal Server Error");
+    }
   });
 
   app.listen(PORT, () => {
